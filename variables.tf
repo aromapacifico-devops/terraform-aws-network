@@ -139,3 +139,53 @@ variable "enable_private_endpoints" {
   type        = bool
   default     = false
 }
+
+variable "enable_flow_logs" {
+  description = "Records the traffic of the VPC in an encrypted log group. Turning it off removes the only record of what crossed the VPC."
+  type        = bool
+  default     = true
+}
+
+variable "flow_logs_log_group_name" {
+  description = "Name of the log group that receives the flow logs. The root builds it and passes the same name to the module that creates the key and the role, so neither depends on the output of this module."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = !var.enable_flow_logs || can(regex("^[./#_A-Za-z0-9-]{1,512}$", var.flow_logs_log_group_name))
+    error_message = "flow_logs_log_group_name must be 1 to 512 characters of letters, digits and ./#_- when enable_flow_logs is true."
+  }
+}
+
+variable "flow_logs_role_arn" {
+  description = "Role that the flow log service assumes to write to the log group. It comes from the security module."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = !var.enable_flow_logs || can(regex("^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$", var.flow_logs_role_arn))
+    error_message = "flow_logs_role_arn must be an IAM role ARN when enable_flow_logs is true."
+  }
+}
+
+variable "flow_logs_kms_key_arn" {
+  description = "Key that encrypts the log group. It comes from the security module."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = !var.enable_flow_logs || can(regex("^arn:aws[a-z-]*:kms:[a-z0-9-]+:[0-9]{12}:key/.+$", var.flow_logs_kms_key_arn))
+    error_message = "flow_logs_kms_key_arn must be a KMS key ARN when enable_flow_logs is true."
+  }
+}
+
+variable "flow_logs_retention_days" {
+  description = "Days the log group keeps the records. The project keeps a year or more. CloudWatch Logs accepts only fixed values."
+  type        = number
+  default     = 365
+
+  validation {
+    condition     = contains([365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653], var.flow_logs_retention_days)
+    error_message = "flow_logs_retention_days must be 365 or a longer retention value that CloudWatch Logs accepts, up to 3653."
+  }
+}

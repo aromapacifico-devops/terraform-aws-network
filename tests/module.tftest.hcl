@@ -16,6 +16,10 @@ variables {
   vpc_name                    = "fnc-aroma-test-vpc-main"
   vpc_cidr                    = "10.60.0.0/16"
   endpoint_security_group_ids = {}
+
+  flow_logs_log_group_name = "/aws/vpc/fnc-aroma-test-vpc-main/flow-logs"
+  flow_logs_role_arn       = "arn:aws:iam::123456789012:role/fnc-aroma-test-role-flow-logs"
+  flow_logs_kms_key_arn    = "arn:aws:kms:us-east-1:123456789012:key/11111111-2222-3333-4444-555555555555"
   subnets = {
     "telemetry-ingress-a" = { name = "fnc-aroma-test-subnet-telemetry-ingress-a", purpose = "telemetry-ingress", cidr = "10.60.0.0/24", availability_zone = "us-east-1a" }
     "drone-ingress-a"     = { name = "fnc-aroma-test-subnet-drone-ingress-a", purpose = "drone-ingress", cidr = "10.60.16.0/24", availability_zone = "us-east-1a" }
@@ -274,6 +278,107 @@ run "rejects_interface_endpoints_without_security_groups" {
   }
 
   expect_failures = [var.endpoint_security_group_ids]
+}
+
+run "flow_logs_are_on_by_default_and_use_the_received_key_and_role" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  assert {
+    condition     = length(aws_cloudwatch_log_group.flow_logs) == 1 && length(aws_flow_log.this) == 1
+    error_message = "One log group and one flow log are expected by default."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_group.flow_logs[0].retention_in_days == 365 && aws_cloudwatch_log_group.flow_logs[0].kms_key_id == var.flow_logs_kms_key_arn
+    error_message = "The log group keeps 365 days and uses the received key."
+  }
+
+  assert {
+    condition     = aws_flow_log.this[0].traffic_type == "ALL" && aws_flow_log.this[0].iam_role_arn == var.flow_logs_role_arn && aws_flow_log.this[0].log_destination_type == "cloud-watch-logs"
+    error_message = "The flow log records all traffic to CloudWatch Logs with the received role."
+  }
+}
+
+run "flow_logs_can_be_turned_off" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  variables {
+    enable_flow_logs      = false
+    flow_logs_role_arn    = ""
+    flow_logs_kms_key_arn = ""
+  }
+
+  assert {
+    condition     = length(aws_cloudwatch_log_group.flow_logs) == 0 && length(aws_flow_log.this) == 0
+    error_message = "No flow log resource is expected when enable_flow_logs is false."
+  }
+
+  # The plan also warns that the VPC keeps no record of its traffic.
+  expect_failures = [check.flow_logs_enabled]
+}
+
+run "rejects_a_retention_below_one_year" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  variables {
+    flow_logs_retention_days = 90
+  }
+
+  expect_failures = [var.flow_logs_retention_days]
+}
+
+run "rejects_flow_logs_without_a_role" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  variables {
+    flow_logs_role_arn = ""
+  }
+
+  expect_failures = [var.flow_logs_role_arn]
+}
+
+run "rejects_flow_logs_without_a_key" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  variables {
+    flow_logs_kms_key_arn = "alias/logs"
+  }
+
+  expect_failures = [var.flow_logs_kms_key_arn]
+}
+
+run "rejects_an_invalid_log_group_name" {
+  command = plan
+
+  providers = {
+    aws.project = aws.project
+  }
+
+  variables {
+    flow_logs_log_group_name = "bad name with spaces"
+  }
+
+  expect_failures = [var.flow_logs_log_group_name]
 }
 
 run "rejects_an_unknown_environment" {
