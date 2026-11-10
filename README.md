@@ -115,9 +115,11 @@ module "network" {
 
 The flow log records every accepted and rejected connection of the network interfaces in the VPC, which today are the interface endpoints. The log group is encrypted with a key from the security module and keeps 365 days. The year is a decision of the project. It is not a requirement of the client, and the module rejects shorter values so that the choice stays deliberate.
 
-The root builds the log group name and passes the same name to the security module, which writes it into the key policy and the role policy. The security module must not read `flow_log_group_arn` from this module, because the key and the role have to exist before the log group does, and reading it would close a loop.
+The root builds the log group name and passes the same name to the security module, which writes it into the key policy and the role policy. The security module must not read `flow_log_group_arn` from this module. The log group needs the key, and a key policy that waits for the log group would close a loop, which Terraform reports as a cycle.
 
-The creation order the module expects, resource by resource, is the role, then the key and its policy, which names that role, then the log group, then the flow log. The VPC, the endpoint security groups and the interface endpoints form a separate chain.
+The creation order the module expects, resource by resource, is the role, then the key and its policy, which names that role, then the log group, then the flow log. The role resource itself must not depend on the key, so a policy that names the key has to be a separate resource attached to the role, and no inline policy inside the role resource may do it. The VPC, the endpoint security groups and the interface endpoints form a separate chain.
+
+What has been checked. The module tests run on a mocked provider and prove the plan of this module only. A stand-in security module that follows this contract, combined with this module in a local root, builds its dependency graph with no cycle, and the same root with the forbidden read of `flow_log_group_arn` fails with a cycle. The stand-in is not the real security module, and nothing here shows that the flow logs reach the log group, that the role and key policies are accepted, or that the encryption works. Those need the real security module in a plan and a deployment.
 
 Turning `enable_flow_logs` off leaves the VPC with no record of its traffic and is meant for throwaway experiments only.
 
