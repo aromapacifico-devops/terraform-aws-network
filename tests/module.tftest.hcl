@@ -17,6 +17,7 @@ variables {
   vpc_cidr                    = "10.60.0.0/16"
   endpoint_security_group_ids = {}
 
+  enable_flow_logs         = true
   flow_logs_log_group_name = "/aws/vpc/fnc-aroma-test-vpc-main/flow-logs"
   flow_logs_role_arn       = "arn:aws:iam::123456789012:role/fnc-aroma-test-role-flow-logs"
   flow_logs_kms_key_arn    = "arn:aws:kms:us-east-1:123456789012:key/11111111-2222-3333-4444-555555555555"
@@ -280,7 +281,7 @@ run "rejects_interface_endpoints_without_security_groups" {
   expect_failures = [var.endpoint_security_group_ids]
 }
 
-run "flow_logs_are_on_by_default_and_use_the_received_key_and_role" {
+run "flow_logs_use_the_received_key_and_role_when_on" {
   command = plan
 
   providers = {
@@ -289,7 +290,7 @@ run "flow_logs_are_on_by_default_and_use_the_received_key_and_role" {
 
   assert {
     condition     = length(aws_cloudwatch_log_group.flow_logs) == 1 && length(aws_flow_log.this) == 1
-    error_message = "One log group and one flow log are expected by default."
+    error_message = "One log group and one flow log are expected when flow logs are on."
   }
 
   assert {

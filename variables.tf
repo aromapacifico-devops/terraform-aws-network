@@ -141,9 +141,9 @@ variable "enable_private_endpoints" {
 }
 
 variable "enable_flow_logs" {
-  description = "Records the traffic of the VPC in an encrypted log group. Turning it off removes the only record of what crossed the VPC."
+  description = "Records the traffic of the VPC in an encrypted log group. It needs the role and the key from the security module, so it stays off until that module provides them."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "flow_logs_log_group_name" {
