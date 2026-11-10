@@ -15,4 +15,10 @@ module "this" {
   subnets                     = local.subnets
   endpoint_security_group_ids = var.endpoint_security_group_ids
   enable_private_endpoints    = var.enable_private_endpoints
+
+  enable_flow_logs         = var.enable_flow_logs
+  flow_logs_log_group_name = local.flow_logs_log_group_name
+  flow_logs_role_arn       = var.flow_logs_role_arn
+  flow_logs_kms_key_arn    = var.flow_logs_kms_key_arn
+  flow_logs_retention_days = var.flow_logs_retention_days
 }

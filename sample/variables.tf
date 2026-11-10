@@ -51,3 +51,25 @@ variable "endpoint_security_group_ids" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_flow_logs" {
+  description = "Records the traffic of the VPC in an encrypted log group."
+  type        = bool
+  default     = true
+}
+
+variable "flow_logs_role_arn" {
+  description = "Role of the flow log service. In a real root it comes from the security module."
+  type        = string
+}
+
+variable "flow_logs_kms_key_arn" {
+  description = "Key of the log group. In a real root it comes from the security module."
+  type        = string
+}
+
+variable "flow_logs_retention_days" {
+  description = "Days the log group keeps the records."
+  type        = number
+  default     = 365
+}

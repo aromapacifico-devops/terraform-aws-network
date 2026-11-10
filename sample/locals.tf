@@ -3,6 +3,8 @@ locals {
   name_prefix = "${var.client}-${var.project}-${var.environment}"
   vpc_name    = "${local.name_prefix}-vpc-main"
 
+  flow_logs_log_group_name = "/aws/vpc/${local.vpc_name}/flow-logs"
+
   purposes = ["telemetry-ingress", "drone-ingress", "application", "data", "object-storage", "administration", "public-query"]
   octet    = split(".", var.vpc_cidr)[1]
 
