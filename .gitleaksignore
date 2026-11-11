@@ -1,0 +1,3 @@
+# Fake security group IDs in the tests, flagged because the key name holds "api".
+bca8633ff62eaed9263027e7736888842c7a7f21:tests/module.tftest.hcl:generic-api-key:97
+bca8633ff62eaed9263027e7736888842c7a7f21:tests/module.tftest.hcl:generic-api-key:132
