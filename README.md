@@ -1,8 +1,6 @@
 # terraform-aws-network
 
-Network of one Aroma Pacifico environment. The module builds the VPC, its seven subnet purposes, the route tables, the free gateway endpoints and, when asked, the private interface endpoints. Test and production use the same code with different variables, and a new availability zone adds one entry per purpose to one variable. It implements the VPC, subnet and route boxes of the implementation scope.
-
-The link to each collection center, with its virtual private gateway and routes, arrives in a later release and is not part of this one.
+Network of one Aroma Pacifico environment. The module builds the VPC, its seven subnet purposes, the route tables, the free gateway endpoints and, when asked, the private interface endpoints and the VPN link to the collection centers. Test and production use the same code with different variables, and a new availability zone adds one entry per purpose to one variable. It implements the VPC, subnet and route boxes of the implementation scope, and the box C04, the link to a collection center, which is built only when a center is given in `center_links`.
 
 ## Why this network exists
 
@@ -18,6 +16,8 @@ The workload is serverless, so most services run outside the VPC. The VPC exists
 | Gateway endpoints | Free private paths to S3 and DynamoDB, attached to both route tables |
 | Interface endpoints | IoT Core data in the telemetry ingress subnets, S3 in the drone object ingress subnets and the private API in the application subnets. One endpoint per service, with a network interface in each zone of its subnet. Created only when `enable_private_endpoints` is true |
 | Flow log and log group | Records all accepted and rejected traffic of the VPC in an encrypted CloudWatch log group, kept 365 days by default. Created only when `enable_flow_logs` is true |
+| Virtual private gateway, customer gateway, VPN connection and static routes | One gateway for the environment, and one customer gateway, one connection and two static routes for each center in `center_links`. Created only when that map is not empty |
+| Routes toward the centers | Two routes for each center in the table `private_center`, `10.X.3.0/24` and `10.X.10.0/24`, with the gateway as target. Nothing in the table `private` |
 | Default security group | The default group of the VPC is adopted with no rules, so no resource can use it by accident. The module creates no other security group |
 
 The seven purposes are telemetry ingress, drone object ingress, application, data, object storage, administration and public query. Three of them hold an interface endpoint today, and four stay reserved so that a later component lands in its place with no renumbering.
@@ -57,6 +57,42 @@ Each purpose takes a /20 block, and each availability zone inside it takes a /24
 
 The ranges 10.41.0.0/16, 10.42.0.0/16 and 10.43.0.0/16 belong to Cauca, Huila and Tolima, so a validation rejects any VPC range that overlaps them.
 
+## Center link
+
+The link is a site-to-site VPN on a virtual private gateway, with static routing and two tunnels for each connection, as the design of the center to cloud link states. It is built from `center_links`, a map keyed by the department code, `"41"` Cauca, `"42"` Huila or `"43"` Tolima. Each entry has a short `name` and the static `public_ip` of the center firewall. The module derives the two ranges of the center from the code, so the department is chosen by a variable and no code is copied.
+
+| Setting | Value |
+|---|---|
+| Routing | Static, with the two ranges of the center as the static routes of its connection |
+| Tunnels | IKEv2 only, AWS starts both, DPD timeout of 30 seconds with the action `restart`. The 30 seconds is a detection time and not a recovery time |
+| Keys | Stored in AWS Secrets Manager, `preshared_key_storage = "SecretsManager"`. The module sets no key, creates no secret of its own and exposes no key. It exports the ARN of the secret, which is a name |
+| Customer gateway ASN | A placeholder of 65000, which matters only for dynamic routing and is not used |
+| Traffic selectors, algorithms and lifetimes | The AWS defaults, to set when the firewall of the center is chosen |
+
+The module does not read, create or show a key, and its tests never read a secret value.
+
+### Routing and authorization
+
+The routes give a path and nothing else. Only the logistics range `10.X.3.0/24` and the local servers range `10.X.10.0/24` of each center are routed, and only in `private_center`, the table of the subnets that hold the endpoints. The Management, Support, Transport and Visitors ranges and the range of the firewall have no route, and nothing is routed in `private`. This is narrower than a route to the whole `10.4X.0.0/16`, on purpose. What may pass over a route is decided by the security groups of the endpoints, the network ACLs, the firewall of the center and the policies of each service, which this module does not touch.
+
+### Activation and addresses
+
+The module links the centers that are in `center_links` and nothing else, so an empty map creates no VPN resource. The root decides which centers to request. The root of this repository set passes only the centers in `linked_centers`, requires a valid address for every one of them when `enable_center_link` is true, makes the plan fail when one is missing, and rejects an address for a center that was not requested. A center is never skipped without a message.
+
+The addresses of the range 203.0.113.0/24 appear only in the examples and the tests, and they are demonstration values. They are not the address of a real center and must not be applied. A real address is the static address that the provider of each center assigns.
+
+### Compatibility
+
+The variable has the default `{}` and the link outputs are empty without a link, so a caller of 1.0.0 that passes no `center_links` gets the same network. The plan of the existing tests holds the same resources, the route tables carry no inline route, and the module needs no new provider. The new outputs of the interface endpoints list facts of the endpoints and exist whenever the endpoints do. A plan against the real state of an existing environment has not been run for this release, so it is not claimed to show no change until someone runs it.
+
+### Tests and what they prove
+
+The tests run on a mocked provider. They prove the plan logic of this module, which are the resources and routes for no, one and three centers, the isolation of the routes, the validation of every input, the tunnel parameters, and that the module sets and exposes no key. They do not prove that AWS accepts the resources, that a tunnel comes up or that a center reaches a service. A real plan in an account shows the association in that account, and a connection test needs the firewall of a center. Both are separate from these tests.
+
+### What the link does not cover
+
+The link carries traffic and does not make every service work. Whether IoT Core data takes TCP 443 or 8883 through its endpoint, which host the upload function signs for S3, and the names that a center uses for each service are open in the design of the link and are not part of this module. The module only outputs the endpoint names and interface identifiers. Nothing here shows that a center reaches IoT Core, S3 or the private API.
+
 ## Usage
 
 Use the latest released tag in place of `v1.0.0`.
@@ -91,6 +127,7 @@ module "network" {
 | `subnets` | `map(object)` | Yes | Name, purpose, range and availability zone of each subnet, keyed by purpose and zone such as `telemetry-ingress-a`. It must hold all seven purposes, one subnet per purpose and zone, inside `vpc_cidr` and without overlaps |
 | `endpoint_security_group_ids` | `map(string)` | Yes | Security group of each interface endpoint, keyed `iot_data`, `s3` and `private_api`. It can be empty while `enable_private_endpoints` is false |
 | `enable_private_endpoints` | `bool` | No | Creates the interface endpoints. Defaults to `false` |
+| `center_links` | `map(object)` | No | Collection centers to link, keyed by department code 41, 42 or 43, each with `name` and a public `public_ip`. Defaults to `{}`, which creates no VPN resource. The keys, the names, the addresses and their uniqueness are validated |
 | `enable_flow_logs` | `bool` | No | Creates the log group and the flow log. Defaults to `false` |
 | `flow_logs_log_group_name` | `string` | When flow logs are on | Name of the log group, built by the root |
 | `flow_logs_role_arn` | `string` | When flow logs are on | Role that the flow log service assumes to write to the group |
@@ -104,6 +141,13 @@ module "network" {
 | `vpc_id` | ID of the VPC |
 | `subnet_ids` | IDs of the subnets, keyed like `subnets` |
 | `route_table_ids` | IDs of the route tables, keyed `private` and `private_center` |
+| `vpn_gateway_id` | ID of the virtual private gateway, or null when no center is linked |
+| `center_link_connection_ids` | ID of the VPN connection of each linked center, keyed by department code |
+| `center_link_tunnel_addresses` | The two outside addresses of the tunnels of each linked center, for the firewall of the center |
+| `center_link_secret_arns` | ARN of the Secrets Manager secret that holds the keys of each linked center. It is a name and not a key |
+| `center_link_routes` | The two ranges routed toward each linked center |
+| `interface_endpoint_dns_names` | Endpoint-specific DNS names of each interface endpoint, empty while the endpoints are off |
+| `interface_endpoint_network_interface_ids` | Network interface IDs of each interface endpoint, empty while the endpoints are off |
 | `flow_log_group_arn` | ARN of the flow log group, or null when flow logs are off |
 | `flow_log_id` | ID of the flow log, or null when flow logs are off |
 
@@ -126,6 +170,8 @@ Only the interface endpoints bill by the hour, and `enable_private_endpoints` tu
 | Item | Rate | Variable |
 |---|---|---|
 | One interface endpoint in one zone | USD 0.01 per hour | `enable_private_endpoints` |
+| One VPN connection | USD 0.05 per hour, USD 36.50 a month | `center_links`, one for each linked center |
+| One secret of pre-shared keys | USD 0.40 a month, one for each connection | `center_links` |
 
 The VPC, the subnets, the route tables and the gateway endpoints have no hourly charge.
 

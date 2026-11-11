@@ -15,6 +15,7 @@ module "this" {
   subnets                     = local.subnets
   endpoint_security_group_ids = var.endpoint_security_group_ids
   enable_private_endpoints    = var.enable_private_endpoints
+  center_links                = var.center_links
 
   enable_flow_logs         = var.enable_flow_logs
   flow_logs_log_group_name = local.flow_logs_log_group_name

@@ -18,3 +18,13 @@ output "flow_log_group_arn" {
   description = "ARN of the flow log group."
   value       = module.this.flow_log_group_arn
 }
+
+output "center_link_connection_ids" {
+  description = "IDs of the VPN connections, empty while no center is linked."
+  value       = module.this.center_link_connection_ids
+}
+
+output "center_link_routes" {
+  description = "Routes toward the linked centers in the table private_center."
+  value       = module.this.center_link_routes
+}

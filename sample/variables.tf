@@ -75,3 +75,12 @@ variable "flow_logs_retention_days" {
   type        = number
   default     = 365
 }
+
+variable "center_links" {
+  description = "Centers linked to the sample, keyed by department code. Leave empty to create no VPN resource. The documentation range in the example of terraform.tfvars is a demonstration value."
+  type = map(object({
+    name      = string
+    public_ip = string
+  }))
+  default = {}
+}
