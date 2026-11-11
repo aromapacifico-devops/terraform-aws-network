@@ -2,12 +2,20 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-11
+
 ### Added
 
 - Optional variable `center_links`, a map keyed by department code 41, 42 or 43 with the name and the static public address of each center. An empty map, the default, creates no VPN resource.
 - A virtual private gateway, a customer gateway, a VPN connection with static routing and two static routes for each linked center, with the keys in Secrets Manager and no key set or exposed by the module.
 - Two routes toward each linked center in `private_center`, `10.X.3.0/24` and `10.X.10.0/24`, and none in `private`.
 - Outputs `vpn_gateway_id`, `center_link_connection_ids`, `center_link_tunnel_addresses`, `center_link_secret_arns` and `center_link_routes` for the link, and `interface_endpoint_dns_names` and `interface_endpoint_network_interface_ids` for the endpoints.
+
+### Compatibility
+
+- No input, output or resource of 1.0.0 changes. A caller of 1.0.0 that passes no `center_links` gets the same network, since the variable defaults to `{}` and creates no VPN resource.
+- The plans of the 20 existing tests are identical between 1.0.0 and 1.1.0, apart from the new empty outputs. That comparison used a mocked provider. It was not made against the state of a real environment.
+- The keys of the VPN connections stay in AWS Secrets Manager. The module sets no key and exposes no key.
 
 ## [1.0.0] - 2026-11-10
 
