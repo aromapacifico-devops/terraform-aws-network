@@ -1,6 +1,6 @@
 # terraform-aws-network
 
-Network of one Aroma Pacifico environment. The module builds the VPC, its seven subnet purposes, the route tables, the free gateway endpoints and, when asked, the private interface endpoints and the VPN link to the collection centers. Test and production use the same code with different variables, and a new availability zone adds one entry per purpose to one variable. It implements the VPC, subnet and route boxes of the implementation scope, and the box C04, the link to a collection center, which is built only when a center is given in `center_links`.
+Network of one Aroma Pacifico environment. The module builds the VPC, its seven subnet purposes, the route tables, the free gateway endpoints and, when asked, the private interface endpoints and the VPN link to the collection centers. Test and production use the same code with different variables, and a new availability zone adds one entry per purpose to one variable. It implements box C03 of the implementation scope, the VPC, subnets and routes, and box C04, the link to a collection center, which is built only when a center is given in `center_links`.
 
 ## Why this network exists
 
