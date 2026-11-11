@@ -189,3 +189,40 @@ variable "flow_logs_retention_days" {
     error_message = "flow_logs_retention_days must be 365 or a longer retention value that CloudWatch Logs accepts, up to 3653."
   }
 }
+
+variable "center_links" {
+  description = "Collection centers linked to this environment, keyed by department code, 41 Cauca, 42 Huila or 43 Tolima. Each entry holds a short name and the static public address of the center firewall. The module derives 10.X.3.0/24 and 10.X.10.0/24 from the code and routes only those two ranges. An empty map, the default, creates no VPN resource."
+  type = map(object({
+    name      = string
+    public_ip = string
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for code in keys(var.center_links) : contains(["41", "42", "43"], code)])
+    error_message = "center_links keys must be the department codes 41, 42 or 43."
+  }
+
+  validation {
+    condition     = alltrue([for link in values(var.center_links) : can(regex("^[a-z][a-z0-9-]{1,19}$", link.name))])
+    error_message = "Each center name must be 2 to 20 lowercase letters, digits or hyphens, starting with a letter."
+  }
+
+  validation {
+    condition     = alltrue([for link in values(var.center_links) : can(cidrhost("${link.public_ip}/32", 0))])
+    error_message = "Each public_ip must be a valid IPv4 address."
+  }
+
+  validation {
+    condition = alltrue([
+      for link in values(var.center_links) :
+      !anytrue([for range in ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16", "224.0.0.0/4", "240.0.0.0/4"] : try(cidrhost("${link.public_ip}/${split("/", range)[1]}", 0) == split("/", range)[0], true)])
+    ])
+    error_message = "Each public_ip must be a public address, not private, shared, loopback, link-local, multicast or reserved."
+  }
+
+  validation {
+    condition     = length(distinct([for link in values(var.center_links) : link.public_ip])) == length(var.center_links)
+    error_message = "Each center needs its own public_ip."
+  }
+}
